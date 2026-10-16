@@ -118,7 +118,6 @@ async def fetch(url,client, retries=5, base_delay=1 ):
    display_error(f"Failed to fetch {url} after {retries} attempts.")
    return None
 
-
 async def parse_generator(response,stats,que):
 
       doc=BeautifulSoup(response.content, "html.parser")
@@ -152,6 +151,7 @@ async def writer(file,que):
     if record == "stop":
       que.task_done()
       break
+      logging.info("writing is completed killing writter....")
     file.write(json.dumps(record) + "\n")
     que.task_done()
 
@@ -159,11 +159,11 @@ async def writer(file,que):
 async def main():
   t1=time.perf_counter()
   stats={"parsed":0 , "skipped":0, "failed_pages":[]}
-  sem=asyncio.Semaphore(4) 
+  url_que=asyncio.Queue(maxsize=50)
   que= asyncio.Queue(maxsize=100)
   async with httpx.AsyncClient(timeout=15) as client: 
         url="https://books.toscrape.com/catalogue/page-1.html"
-        response= await fetch(url,client)
+        response= await fetcher_page1(url,client)
         if response is None:
             stats['failed_pages'].append(url)
             logging.error("could not fetch page 1, aborting")
@@ -180,12 +180,15 @@ async def main():
 
         with open (file_path, 'w', encoding="utf-8") as file:
             writter_task=asyncio.create_task(writer(file,que))
-            tasks=[]
-            for url in url_generator_object:
-                coroutine_object=proccess_page(url,stats,client,sem,que) 
-                tasks.append(coroutine_object)    
-            await asyncio.gather(*tasks)
+            fecher_worker=[asyncio.create_task(proccess_page(stats,client,que,url_que)) for _ in range(4)]
 
+            for url in url_generator_object:
+              await url_que.put(url)
+
+            for _ in range(4):
+             await url_que.put('stop')
+            await asyncio.gather(*fecher_worker)
+            
             await que.put("stop")
 
             await writter_task
@@ -193,13 +196,24 @@ async def main():
         t=t2-t1          
         logging.info(f"The scraper has completed!\n\n number of parsed books: {stats['parsed']} \n\n number of skipped tasks: {stats['skipped']}\n\n number of failed pages is {len(stats['failed_pages'])} \n\n with url list {stats['failed_pages']} \n\n the time taken to complete this sync program is {t}")
         
-async def proccess_page(url,stats,session,sem,que):
-      async with sem:
-        response= await fetch(url,session)
+async def proccess_page(stats,session,que,url_que):
+
+  while True:
+      url=await url_que.get()
+      if url == "stop":
+        url_que.task_done()
+        break
+        logging.info("Fetching and parsing Completed killing workers....")
+      response= await fetch(url,session)
+      url_que.task_done()
       if response is None:
         stats['failed_pages'].append(url)
-        return
+        continue
       await parse_generator(response, stats,que)
+
+async def fetcher_page1(url,client):
+  response=await client.get(url)
+  return response if response.status_code==200 else None
       
         
 if __name__ =="__main__":
