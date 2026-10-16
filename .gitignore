@@ -14,4 +14,5 @@ data/
 practice.py
 Async_Workers_Architecture_Guide.pdf
 guide.html
-
+Async_CPU_ProcessPoolExecutor_Guide.pdf
+generate_guide_pdf.py
