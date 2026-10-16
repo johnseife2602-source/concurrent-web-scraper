@@ -52,8 +52,6 @@ class Book:
 logging.basicConfig(
     level=logging.INFO,                             # Set lowest severity level to capture
     format="%(asctime)s - %(levelname)s - %(message)s", # Structure of the output
-   # filename="app.log",                              # Save logs to a file (instead of console)
-   # filemode="w"                                     # 'w' to overwrite file, 'a' to append
 )
 
 def generate_urls(total_page):
@@ -74,7 +72,7 @@ def fetch(url,session, retries=5, base_delay=1 ):
    for attempt in range(1,retries+1):
         delay=base_delay*(2**(attempt-1))
         try:
-            response=session.get(url, timeout=10)  # 2. This request accepts a cokkie from server and automatically sends that same cookie back and gets a response object
+            response=session.get(url, timeout=10) 
             if response.status_code==200: 
                   return response 
             elif response.status_code==429 or response.status_code>=500:
@@ -106,7 +104,7 @@ def fetch(url,session, retries=5, base_delay=1 ):
         except requests.exceptions.InvalidURL:
                 display_error("Invalid Url \n please check your link")
                 return None
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err: #requests.exceptions.Timeout  this is read timeout connectione happened but there is no answer so read timed out
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
                 
                 display_error(f"Network error on attempt {attempt}: {err}. Retrying in {delay}s...")
                 if attempt != retries:
@@ -166,7 +164,7 @@ def main():
         doc=BeautifulSoup(response.text, "html.parser")
         total_page=doc.select_one("li.current")
         total_page=tag_not_found(total_page,"total_page").split()[-1]  
-        url_generator_object=generate_urls(int(total_page))  #calling a generator returns a generator object and you wake it using a for loop like below or by expicitly saying next or typecast it to a list.  
+        url_generator_object=generate_urls(int(total_page))
         directory=Path(__file__).resolve().parent
         file_path=directory/"data"/"data.jsonl"
         file_path.parent.mkdir(parents=True, exist_ok=True)
